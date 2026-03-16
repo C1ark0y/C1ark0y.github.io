@@ -2,10 +2,10 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Tags on oy的记忆空间</title>
-    <link>https://C1ark0y.github.io/tags/</link>
+    <link>www.clarkoy.top/tags/</link>
     <description>Recent content in Tags on oy的记忆空间</description>
     <generator>Hugo</generator>
     <language>en-us</language>
-    <atom:link href="https://C1ark0y.github.io/tags/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="www.clarkoy.top/tags/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>
